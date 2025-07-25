@@ -32,6 +32,7 @@ use App\Filament\Resources\ProductResource\Pages\EditProduct;
 use App\Filament\Resources\ProductResource\Pages\ListProducts;
 use App\Filament\Resources\ProductResource\Pages\CreateProduct;
 use App\Filament\Resources\ProductResource\Pages\ProductImages;
+use App\Filament\Resources\ProductResource\Pages\ProductVariant;
 
 class ProductResource extends Resource
 {
@@ -151,6 +152,7 @@ class ProductResource extends Resource
         return $page->generateNavigationItems([
             EditProduct::class,
             ProductImages::class,
+            ProductVariant::class,
         ]);
     }
 
@@ -161,6 +163,7 @@ class ProductResource extends Resource
             'create' => Pages\CreateProduct::route('/create'),
             'edit' => Pages\EditProduct::route('/{record}/edit'),
             'images' => Pages\ProductImages::route('/{record}/images'),
+            'variants' => Pages\ProductVariant::route('/{record}/variants'),
         ];
     }
 }
