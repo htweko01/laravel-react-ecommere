@@ -5,17 +5,18 @@ namespace App\Filament\Resources\ProductResource\Pages;
 use Filament\Actions;
 use App\Models\Product;
 use Filament\Forms\Form;
+use App\Models\Attribute;
 use Illuminate\Support\Str;
+use App\Models\AttributeValue;
 use Filament\Forms\Components\Select;
+use Filament\Forms\Components\Section;
+use Filament\Forms\Components\Repeater;
+use Illuminate\Database\Eloquent\Model;
 use Filament\Forms\Components\TextInput;
 use Filament\Resources\Pages\EditRecord;
 use App\Filament\Resources\ProductResource;
-use App\Models\AttributeValue;
-use Filament\Forms\Components\Repeater;
-use Filament\Forms\Components\Section;
-use Filament\Forms\Components\SpatieMediaLibraryFileUpload;
 use Filament\Forms\Components\Actions\Action;
-use Illuminate\Database\Eloquent\Model;
+use Filament\Forms\Components\SpatieMediaLibraryFileUpload;
 
 class ProductVariant extends EditRecord
 {
@@ -25,19 +26,13 @@ class ProductVariant extends EditRecord
 
     public function form(Form $form): Form
     {
-                $components = [];
-
-
-        foreach ($this->record->attributes as $attribute) {
-            $components[] = Select::make($attribute->name)
-                ->options(AttributeValue::where('attribute_id', $attribute->id)
-                    ->pluck('value', 'id'))
-                ->label("Product $attribute->name" . 's')
-                ->multiple()
-                ->required(false)
-                ->dehydrated(true);
-        }
-
+        // $attributeOptions = Attribute::all()->map(function ($attribute) {
+        //         return [
+        //             $attribute->name => $attribute->name,
+        //         ];
+        //     })->reduce(function ($carry, $item) {
+        //         return array_merge($carry, $item);
+        //     }, []);
         return $form
             ->schema([
                 Repeater::make('attributes')
@@ -50,22 +45,27 @@ class ProductVariant extends EditRecord
                     ->schema([
                         Select::make('attribute_id')
                             ->label('Attribute')                          
-                            ->options(\App\Models\Attribute::pluck('name', 'id'))
+                            ->options(Attribute::all()->pluck('name', 'id'))
                             ->searchable()
                             ->reactive()
                             ->afterStateUpdated(function ($state, callable $set) {
+                                $this->record->attributes()->sync(collect($this->data['attributes'])->pluck('attribute_id')->unique());
+
                                 $set('attribute_value_ids', null);
                             })
                             ->columnSpan([
                                 'sm' => 1,
                                 'xl' => 2,
                                 '2xl' => 3,
-                            ]),
+                            ])
+                            ->disableOptionWhen(function ($get) {
+                                return $get('attributes')?->pluck('attribute_id')->contains($get('attribute_id'));
+                            }),
                         Select::make('attribute_value_ids')
                             ->label('Attribute Values')
                             ->options(function ($get) {
                                 $attributeId = $get('attribute_id');
-                                return \App\Models\AttributeValue::where('attribute_id', $attributeId)
+                                return AttributeValue::where('attribute_id', $attributeId)
                                     ->pluck('value', 'id');
                             })
                             ->searchable()
@@ -137,14 +137,28 @@ class ProductVariant extends EditRecord
                         ])->columns(2)
                         ->columnSpan(2)
                 ]),
-            ]);
+            ]); 
     }
 
     private function getProductAttributeComponents()
     {
         $comps = [];
+        // // Generate components for each attribute of the product
+        // return $this->data['attributes'] ?? [];
+        // foreach($this->data['attributes'] as $attribute) {
+        //     if (empty($attribute['attribute_id'])) {
+        //         continue;
+        //     }
+        //     $attributeModel = Attribute::find($attribute['attribute_id']);
+        //     $comps[] = Select::make("attributes_$attributeModel->id")
+        //         ->options(AttributeValue::where('attribute_id', $attribute['attribute_id'])
+        //             ->pluck('value', 'id'))
+        //         ->label($attributeModel->name)
+        //         ->columnSpan(1)
+        //         ->required();
+        // }
         foreach ($this->record->attributes as $index => $attribute) {
-            $comps[] = Select::make("attributes_$attribute->name")
+            $comps[] = Select::make("attributes_$attribute->id")
                 ->options(AttributeValue::where('attribute_id', $attribute->id)
                     ->pluck('value', 'id'))
                 ->label("$attribute->name")
@@ -154,14 +168,88 @@ class ProductVariant extends EditRecord
         return $comps;
     }
 
+    private function generateVariants($get, $set)
+    {
+
+        foreach($this->data['attributes'] as $attribute) {
+            if (empty($attribute['attribute_id'])) {
+                return;
+            }
+        }
+
+        foreach ($this->data['attributes'] as $attribute) {
+            $attributes[$attribute['attribute_id']] = $attribute['attribute_value_ids'] ?? [];
+        }
+
+        $keys = array_keys($attributes);
+        $values = array_values($attributes);
+
+        // Generate all combinations using recursive function
+        $combinations = $this->cartesianProduct($values);
+        // dd($combinations);
+        // Map each combination to attribute names
+        $variants = [];
+
+        foreach ($combinations as $combo) {
+            $variantAttributes = [];
+
+            foreach ($combo as $index => $value) {
+                $variantAttributes["attributes_" . $keys[$index]] = $value;
+            }
+            $variants[] = [
+                ...$variantAttributes,
+                'sku' => '',
+                'price' => $this->record->price,
+            ];
+        }
+
+        $this->data['variants'] = $variants;
+        // $set('variants', $variants);
+    }
+
+    // Recursive Cartesian product generator
+    private function cartesianProduct(array $arrays): array
+    {
+        $result = [[]];
+
+        foreach ($arrays as $property) {
+            $tmp = [];
+
+            foreach ($result as $product) {
+                foreach ($property as $item) {
+                    $tmp[] = array_merge($product, [$item]);
+                }
+            }
+            $result = $tmp;
+        }
+        return $result;
+    }
+
     protected function mutateFormDataBeforeFill(array $data): array
     {
+
+        // get all attribute values for the product variants
         $productVariantAttributeValues = $this->record->variants->map(function ($variant) {
             return $variant->attributeValues->pluck('id')->toArray();
-        })->toArray();
+        })->flatten()->unique()->toArray();
+        // fill the form data for attributes that the prodct has and with the attribute values that are associated with the product variants
         $data['attributes'] = $this->record->attributes->map(function ($attribute) use ($productVariantAttributeValues) {
-            return ['attribute_id' => $attribute->id, 'attribute_value_ids' => $attribute->attriuteValues?->whereIn('id', $productVariantAttributeValues)->pluck('id')->toArray()];
+            return ['attribute_id' => $attribute->id, 'attribute_value_ids' => $attribute->attributeValues->whereIn('id', $productVariantAttributeValues)->pluck('id')->toArray()];
         })->toArray();
+
+        // fill the form data for variants that the product has
+        $data['variants'] = $this->record->variants->map(function ($variant) {
+            $attributes = [];
+            foreach ($variant->attributeValues as $value) {
+                $attributes["attributes_" . $value->attribute->id] = $value->id;
+            }
+            return array_merge($attributes, [
+                'sku' => $variant->sku,
+                'price' => $variant->price,
+                'stock' => $variant->stock,
+            ]);
+        })->toArray();
+        // dd('Mutate Form Data Before Fill Hook Triggered', $data);
         return $data;
     }
 
@@ -173,20 +261,28 @@ class ProductVariant extends EditRecord
 
     protected function handleRecordUpdate(Model $record, array $data): Model
     {
-        $record->attributes()->sync(collect($data['attributes'])->pluck('attribute_id')->unique());
-        // $record->variants()->delete();
-        // foreach ($this->data['variants'] as $key => $variant) {
-        //     $attributeValues = [];
-        //     foreach ($variant as $k => $v) {
-        //         if (Str::startsWith($k, 'attributes_')) {
-        //             $attributeValues[] = $v;
-        //             unset($this->data['variants'][$key][$k]);
-        //         }
-        //     }
-        //     $variantModel = $record->variants()->create($this->data['variants'][$key]);
-        //     $variantModel->attributeValues()->sync($attributeValues);
-        // }
+        // dd('Handle Record Update Hook Triggered', $data);
+        // $record->attributes()->sync(collect($data['attributes'])->pluck('attribute_id')->unique());
+        $record->variants()->delete();
+        foreach ($this->data['variants'] as $key => $variant) {
+            $attributeValues = [];
+            foreach ($variant as $k => $v) {
+                if (Str::startsWith($k, 'attributes_')) {
+                    $attributeValues[] = $v;
+                    unset($this->data['variants'][$key][$k]);
+                }
+            }
+            $variantModel = $record->variants()->create($this->data['variants'][$key]);
+            $variantModel->attributeValues()->sync($attributeValues);
+        }
         return $record;
+    }
+
+    protected function getRedirectUrl(): string
+    {
+        return $this->getResource()::getUrl('variants', [
+            'record' => $this->record,
+        ]);
     }
 
 }
