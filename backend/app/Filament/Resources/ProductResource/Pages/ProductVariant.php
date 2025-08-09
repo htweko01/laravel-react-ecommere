@@ -49,6 +49,11 @@ class ProductVariant extends EditRecord
                             ->searchable()
                             ->reactive()
                             ->afterStateUpdated(function ($state, callable $set) {
+                                if (empty($state)) {
+                                    $set('attribute_value_ids', null);
+                                    return;
+                                }
+
                                 $this->record->attributes()->sync(collect($this->data['attributes'])->pluck('attribute_id')->unique());
 
                                 $set('attribute_value_ids', null);
@@ -58,6 +63,19 @@ class ProductVariant extends EditRecord
                                 'xl' => 2,
                                 '2xl' => 3,
                             ])
+                            ->createOptionForm([
+                                TextInput::make('name')
+                                    ->label('Attribute Name')
+                                    ->required()
+                                    ->maxLength(255)
+                                    ->reactive()
+                            ])
+                            ->createOptionUsing(function(array $data):int {
+                                return Attribute::create([
+                                    'name' => $data['name'],
+                                ])->getKey();
+                                
+                            })
                             ->disableOptionWhen(function ($get) {
                                 return $get('attributes')?->pluck('attribute_id')->contains($get('attribute_id'));
                             }),
@@ -70,25 +88,28 @@ class ProductVariant extends EditRecord
                             })
                             ->searchable()
                             ->multiple()
+                            ->disabled(fn(callable $get) => !$get('attribute_id'))
+                            ->createOptionForm([
+                                TextInput::make('value')
+                                    ->label('Attribute Value')
+                                    ->required()
+                                    ->unique(AttributeValue::class, 'value', ignoreRecord: true)
+                                    ->maxLength(255)
+                                    ->reactive()
+                            ])
+                            ->createOptionUsing(function(array $data, callable $get) {
+                                return AttributeValue::create([
+                                    'attribute_id' => $get('attribute_id'),
+                                    'value' => $data['value'],
+                                ])->getKey();
+                            })
                             ->columnSpan([
                                 'sm' => 2,
                                 'xl' => 4,
                                 '2xl' => 5,
                             ]),
                     ]),
-                // Select::make('attributes')
-                //     ->label('Attributes')
-                //     ->relationship('attributes', 'name')
-                //     ->columnSpan('2')
-                //     ->multiple()
-                //     ->preload()
-                //     ->searchable()
-                //     ->required()
-                //     ->reactive()
-                //     ->afterStateUpdated(function (string $operation, $state, callable $set) {
-                //         $this->record->attributes()->sync($state);
-                //     }),
-                // ...$components,
+                
                 Section::make('Product Variant')
                 ->columns(2)
                 ->schema([
@@ -113,7 +134,6 @@ class ProductVariant extends EditRecord
                         )
                         ->dehydrated(true),
                     Repeater::make('variants')
-                        // ->relationship('variants')
                         ->schema([
                             ...$this->getProductAttributeComponents(),
                             TextInput::make('sku')
@@ -143,20 +163,6 @@ class ProductVariant extends EditRecord
     private function getProductAttributeComponents()
     {
         $comps = [];
-        // // Generate components for each attribute of the product
-        // return $this->data['attributes'] ?? [];
-        // foreach($this->data['attributes'] as $attribute) {
-        //     if (empty($attribute['attribute_id'])) {
-        //         continue;
-        //     }
-        //     $attributeModel = Attribute::find($attribute['attribute_id']);
-        //     $comps[] = Select::make("attributes_$attributeModel->id")
-        //         ->options(AttributeValue::where('attribute_id', $attribute['attribute_id'])
-        //             ->pluck('value', 'id'))
-        //         ->label($attributeModel->name)
-        //         ->columnSpan(1)
-        //         ->required();
-        // }
         foreach ($this->record->attributes as $index => $attribute) {
             $comps[] = Select::make("attributes_$attribute->id")
                 ->options(AttributeValue::where('attribute_id', $attribute->id)
@@ -204,7 +210,7 @@ class ProductVariant extends EditRecord
         }
 
         $this->data['variants'] = $variants;
-        // $set('variants', $variants);
+        
     }
 
     // Recursive Cartesian product generator
@@ -254,15 +260,9 @@ class ProductVariant extends EditRecord
     }
 
     
-    // protected function beforeValidate(): void
-    // {
-    //     dd('Before Validate Hook Triggered', $this->data);
-    // }
-
     protected function handleRecordUpdate(Model $record, array $data): Model
     {
-        // dd('Handle Record Update Hook Triggered', $data);
-        // $record->attributes()->sync(collect($data['attributes'])->pluck('attribute_id')->unique());
+
         $record->variants()->delete();
         foreach ($this->data['variants'] as $key => $variant) {
             $attributeValues = [];
