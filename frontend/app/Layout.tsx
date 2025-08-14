@@ -6,7 +6,7 @@ function Layout() {
   return (
     <>
         <Navbar/>
-        <div className="xl:w-5/6 mx-auto">
+        <div className="xl:w-5/6 mx-auto py-5">
           <Outlet/>
         </div>
     </>
