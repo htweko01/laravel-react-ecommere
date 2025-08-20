@@ -3,6 +3,7 @@ import type { Route } from "./+types/home";
 import { useQuery } from "@tanstack/react-query";
 import ProductCard from "~/components/ProductCard";
 import SkeletonProductCard from "~/components/SkeletonProductCard";
+import { NavLink } from "react-router";
 export function meta({}: Route.MetaArgs) {
   return [
     { title: "Ecommmerce" },
@@ -31,7 +32,10 @@ export default function Home() {
       {
         data.map((product: Product) => (
 
-          <ProductCard key={product.id} {...product}/>
+          // <ProductCard key={product.id} {...product}/>
+          <NavLink key={product.id} to={`/products/${product.id}`}>
+            <ProductCard {...product} />
+          </NavLink>
         ))
         
       }

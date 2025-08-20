@@ -2,28 +2,28 @@
 
 namespace App\Http\Resources;
 
-use App\Models\ProductVariant;
+use App\Models\Product;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 
-class ProductVariantResource extends JsonResource
+class ProductListResource extends JsonResource
 {
     /**
      * Transform the resource into an array.
      *
      * @return array<string, mixed>
      */
-    public $collects = ProductVariant::class;
+    public $collects = Product::class;
     public function toArray(Request $request): array
     {
         return [
             'id' => $this->id,
-            'product_id' => $this->product_id,
+            'name' => $this->name,
+            'slug' => $this->slug,
             'price' => $this->price,
+            'image' => $this->getFirstMediaUrl('images'),
             'stock' => $this->stock,
-            'sku' => $this->sku,
-            'created_at' => $this->created_at,
-            'updated_at' => $this->updated_at,
+            
         ];
     }
 }

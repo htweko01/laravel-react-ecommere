@@ -4,17 +4,18 @@ function ProductCard(props: Product) {
   return (
     <>
       <div className="group relative">
-        {props.media.map((media) => {
+        {/* {props.media.map((media) => {
           if (media.order === 1) {
             return (
-              <img
-                src={media.url}
+              
+            );
+          }
+        })} */}
+        <img
+                src={props.image}
                 alt={props.name}
                 className="aspect-square w-full rounded-md bg-gray-200 object-cover group-hover:opacity-75 lg:aspect-auto lg:h-80"
               />
-            );
-          }
-        })}
         <div className="mt-4 flex justify-between">
           <div>
             <h3 className="text-sm text-gray-700 dark:text-gray-300">

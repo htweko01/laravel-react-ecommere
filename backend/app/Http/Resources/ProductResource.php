@@ -23,8 +23,10 @@ class ProductResource extends JsonResource
             'category' => new CategoryResource($this->whenLoaded('category')),
             'department' => new DepartmentResource($this->whenLoaded('department')),
             'stock' => $this->stock,
+            'status' => $this->status,
+            'slug' => $this->slug,
             'variants' => ProductVariantResource::collection($this->whenLoaded('variants')),
-            'media' => MediaResource::collection($this->media),
+            'media' => MediaResource::collection($this->whenLoaded('media')),
             'created_at' => $this->created_at,  
             'updated_at' => $this->updated_at,
         ];

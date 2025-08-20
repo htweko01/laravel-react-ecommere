@@ -1,4 +1,5 @@
-const BASE_URL = import.meta.env.VITE_API_BASE_URL;
+const BASE_URL:string = import.meta.env.VITE_API_BASE_URL;
+const API_KEY:string = import.meta.env.VITE_API_KEY;
 
 export interface ProductVariant {
     id: number;
@@ -16,9 +17,10 @@ export interface Media {
 
 export interface Product {
     id: number;
-    title: string;
+    name: string;
     price: number;
-    description: string;
+    description?: string;
+    image?: string;
     category?: {
         id: number;
         name: string;
@@ -30,9 +32,13 @@ export interface Product {
         slug: string;
     }
     variants?: ProductVariant[];
-    media: Media[];
+    media?: Media[];
 }
 
 export function products() {
     return fetch(`${BASE_URL}/products`).then((response) => response.json())
+}
+
+export function getProduct(id: number) {
+    return fetch(`${BASE_URL}/products/${id}`).then((response) => response.json())
 }
